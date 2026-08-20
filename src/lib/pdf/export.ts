@@ -232,8 +232,11 @@ export async function buildPdfBytes(input: ExportInput, pageIds?: string[]): Pro
       )
       const cover = tightCover(repl)
       const bg = sampleBackgroundRgb(sampleCanvas, cover, meta.width, meta.height) ?? FALLBACK_BG_RGB
-      const a = viewport.convertToPdfPoint(cover.x, cover.y) as [number, number]
-      const b = viewport.convertToPdfPoint(cover.x + cover.width, cover.y + cover.height) as [number, number]
+      // Thêm extra padding ngang để đảm bảo che hết text gốc (box.width có thể bị underestimate)
+      const extraCover = Math.max(1, repl.fontSize * 0.5)
+      const coverWide = { ...cover, x: cover.x - extraCover, width: cover.width + extraCover * 2 }
+      const a = viewport.convertToPdfPoint(coverWide.x, coverWide.y) as [number, number]
+      const b = viewport.convertToPdfPoint(coverWide.x + coverWide.width, coverWide.y + coverWide.height) as [number, number]
       const x = Math.min(a[0], b[0])
       const y = Math.min(a[1], b[1])
       const width = Math.abs(b[0] - a[0])

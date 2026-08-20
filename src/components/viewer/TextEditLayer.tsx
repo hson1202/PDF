@@ -194,19 +194,32 @@ export function TextEditLayer({ page, scale, canvasRef, paintGen = 0 }: Props) {
     const fontCss = cssFontShorthand(geom.fontId || inferFontId(geom.fontFamily), geom.fontSize, geom.bold, geom.italic)
     const fitted = fitFontSize(measureCssTextWidth(text, fontCss), geom.fontSize, geom.width)
     const fontSize = fitted * scale
-    const bg = opts?.bg || (geom.id ? bgById.get(geom.id) : undefined) || sampleBackground(
-      canvasRef?.current,
-      cover,
-      page.width,
-      page.height,
-    )
+    const bg = opts?.bg
+      ?? (geom.id ? bgById.get(geom.id) : undefined)
+      ?? sampleBackground(canvasRef?.current, cover, page.width, page.height)
+      ?? '#ffffff'
+    // Extra horizontal padding để đảm bảo che hết text gốc kể cả khi box.width bị underestimate
+    const extraCoverPx = Math.max(4, geom.fontSize * scale * 0.5)
     return (
       <div
         className="group absolute"
         style={{ left, top, width, height, zIndex: 6 }}
         onClick={opts?.onClick}
       >
-        <div className="absolute inset-0 overflow-hidden" style={{ background: bg }}>
+        {/* Lớp nền che text cũ – extend ra ngoài để đảm bảo che hết */}
+        <div
+          className="absolute"
+          style={{
+            left: -extraCoverPx,
+            right: -extraCoverPx,
+            top: 0,
+            bottom: 0,
+            backgroundColor: bg,
+            pointerEvents: 'none',
+          }}
+        />
+        {/* Text mới hiển thị trong vùng cover, clip đúng */}
+        <div className="absolute inset-0 overflow-hidden">
           <span
             className="absolute block overflow-hidden whitespace-pre"
             style={{
@@ -246,7 +259,7 @@ export function TextEditLayer({ page, scale, canvasRef, paintGen = 0 }: Props) {
   return (
     <div className="absolute inset-0" style={{ zIndex: 5, pointerEvents: active ? 'auto' : 'none' }}>
       {painted.orphans.map((r) => (
-        <div key={r.id}>{renderCover(r, r.newText, { bg: bgById.get(r.id) })}</div>
+        <div key={r.id}>{renderCover(r, r.newText, { bg: bgById.get(r.id) ?? sampleBackground(canvasRef?.current, tightCover(r), page.width, page.height) ?? '#ffffff' })}</div>
       ))}
 
       {painted.rows.map(({ box, existing }) => {
@@ -330,13 +343,7 @@ export function TextEditLayer({ page, scale, canvasRef, paintGen = 0 }: Props) {
                   }
                 }}
               />
-              {/* Hint: Enter xuống dòng, Ctrl+Enter xác nhận */}
-              <span
-                className="pointer-events-none absolute left-0 whitespace-nowrap rounded-b bg-blue-600 px-1.5 py-0.5 text-[9px] leading-none text-white opacity-80"
-                style={{ top: '100%', zIndex: 9 }}
-              >
-                Enter ↵ · Ctrl+Enter ✓ · Esc ✕
-              </span>
+
             </div>
           )
         }
