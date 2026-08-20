@@ -104,6 +104,7 @@ export type TextReplacement = {
   bold: boolean
   italic: boolean
   underline: boolean
+  strikethrough: boolean
   ascent: number
 }
 

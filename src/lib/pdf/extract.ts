@@ -193,13 +193,14 @@ export async function extractTextBoxes(page: PDFPageProxy, viewport: PageViewpor
     const y = baseline - ascent
     const width = (item.width || 0) * viewport.scale
     if (width < 0.5 && item.str.trim().length === 0) continue
+    const descent = fontSize * 0.12
 
     glyphs.push({
       str: item.str,
       x,
       y,
       width: Math.max(width, fontSize * 0.15),
-      height: Math.max(fontSize, ascent + fontSize * 0.22),
+      height: ascent + descent,
       fontSize,
       fontFamily,
       ascent,

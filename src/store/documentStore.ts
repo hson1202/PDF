@@ -110,19 +110,25 @@ function isIdentityReplacement(repl: TextReplacement) {
     isDefaultTextColor(repl.color) &&
     !repl.bold &&
     !repl.italic &&
-    !repl.underline
+    !repl.underline &&
+    !repl.strikethrough
   )
+}
+
+function normFontId(id: TextReplacement['fontId']): string {
+  return id || 'helvetica'
 }
 
 function sameReplacement(a: TextReplacement, b: TextReplacement) {
   return (
     a.newText === b.newText &&
-    a.fontId === b.fontId &&
+    normFontId(a.fontId) === normFontId(b.fontId) &&
     Math.abs(a.fontSize - b.fontSize) < 0.01 &&
     a.color === b.color &&
     a.bold === b.bold &&
     a.italic === b.italic &&
-    a.underline === b.underline
+    a.underline === b.underline &&
+    a.strikethrough === b.strikethrough
   )
 }
 
@@ -241,6 +247,7 @@ export const useDocumentStore = create<DocumentState & DocumentActions>((set, ge
         bold: style.bold,
         italic: style.italic,
         underline: style.underline,
+        strikethrough: style.strikethrough,
         ascent: native.ascent,
       }
       get().upsertTextReplacement(repl)

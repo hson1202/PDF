@@ -17,6 +17,7 @@ export function PdfPageView({ page, index }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const { sources, zoom, currentPageIndex } = useDocumentStore()
   const [visible, setVisible] = useState(index < 2)
+  const [paintGen, setPaintGen] = useState(0)
 
   useEffect(() => {
     const el = wrapRef.current
@@ -65,6 +66,7 @@ export function PdfPageView({ page, index }: Props) {
       taskRef.cancel = () => task.cancel()
       try {
         await task.promise
+        if (!cancelled) setPaintGen((n) => n + 1)
       } catch {
         // cancelled
       }
@@ -100,7 +102,7 @@ export function PdfPageView({ page, index }: Props) {
                 <AnnotationLayer page={page} scale={scale} width={cssW} height={cssH} />
                 <FormLayer page={page} scale={scale} />
                 <TextMarkupLayer page={page} scale={scale} />
-                <TextEditLayer page={page} scale={scale} />
+                <TextEditLayer page={page} scale={scale} canvasRef={canvasRef} paintGen={paintGen} />
               </>
             ) : null}
           </>

@@ -6,6 +6,7 @@ import {
   AlignRight,
   Bold,
   Italic,
+  Strikethrough,
   Underline,
 } from 'lucide-react'
 import { APP_FONTS, FONT_GROUPS, FONT_SIZES, fontCssFamily, type FontId, type TextAlign } from '@/lib/fonts'
@@ -78,7 +79,8 @@ export function FormatBar() {
   } = useDocumentStore()
   const selected = annotations.find((a) => a.id === selectedAnnotationId)
   const selectedText = selected && isTextBox(selected) ? selected : null
-  const showFill = tool === 'text' || selectedText?.type === 'text'
+  const showFill = (tool === 'text' || selectedText?.type === 'text') && tool !== 'editText'
+  const showAlign = tool !== 'editText'
   const visible =
     pages.length > 0 &&
     (tool === 'text' || tool === 'sticky' || tool === 'editText' || Boolean(selectedText))
@@ -103,6 +105,7 @@ export function FormatBar() {
       bold: selectedText.bold ?? false,
       italic: selectedText.italic ?? false,
       underline: selectedText.underline ?? false,
+      strikethrough: false,
       align: selectedText.align ?? 'left',
     })
   }, [
@@ -245,30 +248,45 @@ export function FormatBar() {
       >
         <Underline className="h-3.5 w-3.5" />
       </button>
+      <button
+        type="button"
+        title="Gạch ngang"
+        onClick={() => applyTextStyle({ strikethrough: !textStyle.strikethrough })}
+        className={cn(
+          'flex h-7 w-7 items-center justify-center rounded-md text-zinc-600 hover:bg-zinc-100',
+          textStyle.strikethrough && 'bg-blue-50 text-blue-700',
+        )}
+      >
+        <Strikethrough className="h-3.5 w-3.5" />
+      </button>
 
-      <div className="mx-0.5 h-5 w-px shrink-0 bg-zinc-200" />
+      {showAlign ? (
+        <>
+          <div className="mx-0.5 h-5 w-px shrink-0 bg-zinc-200" />
 
-      {(
-        [
-          ['left', AlignLeft, 'Căn trái'],
-          ['center', AlignCenter, 'Căn giữa'],
-          ['right', AlignRight, 'Căn phải'],
-          ['justify', AlignJustify, 'Căn đều'],
-        ] as const
-      ).map(([id, Icon, title]) => (
-        <button
-          key={id}
-          type="button"
-          title={title}
-          onClick={() => applyTextStyle({ align: id as TextAlign })}
-          className={cn(
-            'flex h-7 w-7 items-center justify-center rounded-md text-zinc-600 hover:bg-zinc-100',
-            textStyle.align === id && 'bg-blue-50 text-blue-700',
-          )}
-        >
-          <Icon className="h-3.5 w-3.5" />
-        </button>
-      ))}
+          {(
+            [
+              ['left', AlignLeft, 'Căn trái'],
+              ['center', AlignCenter, 'Căn giữa'],
+              ['right', AlignRight, 'Căn phải'],
+              ['justify', AlignJustify, 'Căn đều'],
+            ] as const
+          ).map(([id, Icon, title]) => (
+            <button
+              key={id}
+              type="button"
+              title={title}
+              onClick={() => applyTextStyle({ align: id as TextAlign })}
+              className={cn(
+                'flex h-7 w-7 items-center justify-center rounded-md text-zinc-600 hover:bg-zinc-100',
+                textStyle.align === id && 'bg-blue-50 text-blue-700',
+              )}
+            >
+              <Icon className="h-3.5 w-3.5" />
+            </button>
+          ))}
+        </>
+      ) : null}
     </div>
   )
 }

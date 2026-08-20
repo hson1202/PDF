@@ -11,6 +11,7 @@ export type TextStyle = {
   bold: boolean
   italic: boolean
   underline: boolean
+  strikethrough: boolean
   align: TextAlign
 }
 
@@ -22,6 +23,7 @@ export const DEFAULT_TEXT_STYLE: TextStyle = {
   bold: false,
   italic: false,
   underline: false,
+  strikethrough: false,
   align: 'left',
 }
 

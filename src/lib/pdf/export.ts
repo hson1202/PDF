@@ -3,6 +3,11 @@ import {
   rgb,
   degrees,
   StandardFonts,
+  clip,
+  endPath,
+  pushGraphicsState,
+  popGraphicsState,
+  rectangle as pathRectangle,
   type PDFFont,
   type PDFPage,
   type PDFImage,
@@ -15,10 +20,11 @@ import type {
   SourceDoc,
   TextReplacement,
 } from '@/types'
-import { getPdfjsPage } from '@/lib/pdf/pdfjs'
+import { AnnotationMode, getPdfjsPage, type PDFPageProxy } from '@/lib/pdf/pdfjs'
 import { renderAnnotationsPng } from '@/lib/pdf/overlay'
 import { fontVariant, getFont, type FontId } from '@/lib/fonts'
 import { hexToRgb } from '@/lib/utils'
+import { FALLBACK_BG_RGB, fitFontSize, sampleBackgroundRgb, tightCover } from '@/lib/pdf/textCover'
 
 export type ExportInput = {
   sources: SourceDoc[]
@@ -128,6 +134,28 @@ function pdfColor(hex: string) {
   return rgb(r / 255, g / 255, b / 255)
 }
 
+const SAMPLE_SCALE = 2
+
+async function renderSampleCanvas(pdfPage: PDFPageProxy) {
+  const viewport = pdfPage.getViewport({ scale: SAMPLE_SCALE })
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.max(1, Math.round(viewport.width))
+  canvas.height = Math.max(1, Math.round(viewport.height))
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })
+  if (!ctx) return null
+  try {
+    await pdfPage.render({
+      canvas,
+      canvasContext: ctx,
+      viewport,
+      annotationMode: AnnotationMode.ENABLE_FORMS,
+    }).promise
+  } catch {
+    return null
+  }
+  return canvas
+}
+
 function drawOverlayImage(page: PDFPage, image: PDFImage, viewport: {
   width: number
   height: number
@@ -191,6 +219,7 @@ export async function buildPdfBytes(input: ExportInput, pageIds?: string[]): Pro
     const viewport = pdfjsPage.getViewport({ scale: 1 })
 
     const replacements = input.textReplacements.filter((r) => r.pageId === meta.id)
+    const sampleCanvas = replacements.length > 0 ? await renderSampleCanvas(pdfjsPage) : null
     for (const repl of replacements) {
       const text = repl.newText
       const size = repl.fontSize
@@ -201,13 +230,10 @@ export async function buildPdfBytes(input: ExportInput, pageIds?: string[]): Pro
         Boolean(repl.bold),
         Boolean(repl.italic),
       )
-      const textWidth = text ? usedFont.widthOfTextAtSize(text, size) : 0
-      const padX = Math.max(1.2, size * 0.08)
-      const padY = Math.max(1, size * 0.14)
-      const boxW = Math.max(repl.width, textWidth) + padX * 2
-      const boxH = Math.max(repl.height, size * 1.2) + padY * 2
-      const a = viewport.convertToPdfPoint(repl.x - padX, repl.y - padY) as [number, number]
-      const b = viewport.convertToPdfPoint(repl.x - padX + boxW, repl.y - padY + boxH) as [number, number]
+      const cover = tightCover(repl)
+      const bg = sampleBackgroundRgb(sampleCanvas, cover, meta.width, meta.height) ?? FALLBACK_BG_RGB
+      const a = viewport.convertToPdfPoint(cover.x, cover.y) as [number, number]
+      const b = viewport.convertToPdfPoint(cover.x + cover.width, cover.y + cover.height) as [number, number]
       const x = Math.min(a[0], b[0])
       const y = Math.min(a[1], b[1])
       const width = Math.abs(b[0] - a[0])
@@ -217,30 +243,45 @@ export async function buildPdfBytes(input: ExportInput, pageIds?: string[]): Pro
         y,
         width,
         height,
-        color: rgb(1, 1, 1),
+        color: rgb(bg.r / 255, bg.g / 255, bg.b / 255),
         borderWidth: 0,
       })
       if (!text) continue
+      const usedSize = fitFontSize(usedFont.widthOfTextAtSize(text, size), size, repl.width)
       const orig = repl.origFontSize || size
       const ascent = orig > 0.1 ? (repl.ascent || orig * 0.8) * (size / orig) : size * 0.8
-      const baseline = viewport.convertToPdfPoint(repl.x, repl.y + ascent) as [number, number]
+      const origin = viewport.convertToPdfPoint(repl.x, repl.y + ascent) as [number, number]
+      const textWidth = usedFont.widthOfTextAtSize(text, usedSize)
+      page.pushOperators(pushGraphicsState(), pathRectangle(x, y, width, height), clip(), endPath())
       page.drawText(text, {
-        x: Math.min(a[0], b[0]) + 0.6,
-        y: baseline[1],
-        size,
+        x: origin[0],
+        y: origin[1],
+        size: usedSize,
         font: usedFont,
         color: pdfColor(repl.color || '#111827'),
       })
-      if (repl.underline && text) {
-        const thickness = Math.max(0.6, size * 0.06)
+      if (repl.underline) {
+        const thickness = Math.max(0.6, usedSize * 0.06)
         page.drawRectangle({
-          x: Math.min(a[0], b[0]) + 0.6,
-          y: baseline[1] - thickness * 1.4,
+          x: origin[0],
+          y: origin[1] - thickness * 1.4,
           width: textWidth,
           height: thickness,
           color: pdfColor(repl.color || '#111827'),
         })
       }
+      if (repl.strikethrough) {
+        const thickness = Math.max(0.5, usedSize * 0.055)
+        // Gạch ngang ở khoảng 40% chiều cao tính từ baseline lên
+        page.drawRectangle({
+          x: origin[0],
+          y: origin[1] + usedSize * 0.25,
+          width: textWidth,
+          height: thickness,
+          color: pdfColor(repl.color || '#111827'),
+        })
+      }
+      page.pushOperators(popGraphicsState())
     }
 
     const anns = input.annotations.filter((a) => a.pageId === meta.id)

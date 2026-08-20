@@ -8,7 +8,7 @@ const cache = new Map<string, TextItemBox[]>()
 const inflight = new Map<string, Promise<TextItemBox[]>>()
 
 function cacheKey(page: PageMeta) {
-  return `${page.sourceId}:${page.sourcePageIndex}`
+  return `v2:${page.sourceId}:${page.sourcePageIndex}`
 }
 
 async function loadBoxes(page: PageMeta, bytes: Uint8Array) {
